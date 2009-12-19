@@ -30,6 +30,7 @@
 -export([start/0,
 	 to_record/3,
 	 add/3,
+	 remove/2,
 	 add_list/3,
 	 match_rule/3,
 	 % for debugging only
@@ -98,6 +99,12 @@ add(Host, ACLName, ACLSpec) ->
 	end,
     mnesia:transaction(F).
 
+remove(Host, ACLName) ->
+    F = fun() ->
+               mnesia:delete({acl, {ACLName, Host}})
+       end,
+    mnesia:transaction(F).
+    
 %% @spec (Host, ACLs, Clear) -> ok | false
 %%     Host = global | string()
 %%     ACLs = [acl()]

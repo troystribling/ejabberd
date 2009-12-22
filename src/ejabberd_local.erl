@@ -292,11 +292,11 @@ handle_info(refresh_iq_handlers, State) ->
     {noreply, State};
 handle_info({register_host, Host}, State) ->
     ejabberd_router:register_route(Host, {apply, ?MODULE, route}),
-    ejabberd_hooks:add(local_send_to_resource_hook, Host, ?MODULE, bounce_resource_packet, 100),
+    ejabberd_hooks:add(local_send_to_resource_hook, list_to_binary(Host), ?MODULE, bounce_resource_packet, 100),
     {noreply, State};    
 handle_info({unregister_host, Host}, State) ->
     ejabberd_router:unregister_route(Host),
-    ejabberd_hooks:delete(local_send_to_resource_hook, Host, ?MODULE, bounce_resource_packet, 100),
+    ejabberd_hooks:delete(local_send_to_resource_hook, list_to_binary(Host), ?MODULE, bounce_resource_packet, 100),
     {noreply, State};
 handle_info({timeout, _TRef, ID}, State) ->
     process_iq_timeout(ID),

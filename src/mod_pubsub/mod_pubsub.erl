@@ -640,7 +640,7 @@ disco_local_features(Acc, _From, To, <<>>, _Lang) ->
     end,
     {result, Feats ++ lists:map(fun(Feature) ->
 	?NS_PUBSUB_s++"#"++Feature
-    end, features(Host, []))};
+    end, features(Host, <<>>))};
 disco_local_features(Acc, _From, _To, _Node, _Lang) ->
     Acc.
 
@@ -727,18 +727,27 @@ disco_sm_items(Acc, From, To, NodeB, _Lang) ->
 %% -------
 %% presence hooks handling functions
 %%
-
-presence_probe(JID, JID, Pid) ->
-    {User, Server, Resource} = jlib:short_prepd_jid(JID),
-    Host = exmpp_jid:prep_domain_as_list(JID),
-    Proc = gen_mod:get_module_proc(Host, ?PROCNAME),
-    gen_server:cast(Proc, {presence, JID, Pid}),
-    gen_server:cast(Proc, {presence, User, Server, [Resource], JID});
-presence_probe(Peer, JID, _Pid) ->
-    {User, Server, Resource} = jlib:short_prepd_jid(Peer),
-    Host = exmpp_jid:prep_domain_as_list(JID),
-    Proc = gen_mod:get_module_proc(Host, ?PROCNAME),
-    gen_server:cast(Proc, {presence, User, Server, [Resource], JID}).
+presence_probe(Peer, JID, Pid) ->
+    case exmpp_jid:full_compare(Peer, JID) of
+        true -> %% JID are equals
+            {User, Server, Resource} = jlib:short_prepd_jid(Peer),
+            Host = exmpp_jid:prep_domain_as_list(JID),
+            Proc = gen_mod:get_module_proc(Host, ?PROCNAME),
+            gen_server:cast(Proc, {presence, JID, Pid}),
+            gen_server:cast(Proc, {presence, User, Server, [Resource], JID});
+        false ->
+            case exmpp_jid:bare_compare(Peer, JID) of
+                true ->
+                    %% ignore presence_probe from other ressources for the current user
+                    %% this way, we do not send duplicated last items if user already connected with other clients
+                    ok;
+                false ->
+                    {User, Server, Resource} = jlib:short_prepd_jid(Peer),
+                    Host = exmpp_jid:prep_domain_as_list(JID),
+                    Proc = gen_mod:get_module_proc(Host, ?PROCNAME),
+                    gen_server:cast(Proc, {presence, User, Server, [Resource], JID})
+            end
+    end.
 
 %% -------
 %% subscription hooks handling functions
@@ -769,7 +778,7 @@ in_subscription(_, _, _, _, _, _) ->
 remove_user(User, Server) ->
     LUser = exmpp_stringprep:nodeprep(User),
     LServer = exmpp_stringprep:nameprep(Server),
-    Proc = gen_mod:get_module_proc(Server, ?PROCNAME),
+    Proc = gen_mod:get_module_proc(binary_to_list(Server), ?PROCNAME),
     gen_server:cast(Proc, {remove_user, LUser, LServer}).
 
 %%--------------------------------------------------------------------
@@ -1552,7 +1561,7 @@ send_authorization_request(#pubsub_node{owners = Owners, nodeid = {Host, Node}},
 		  [#xmlel{ns = ?NS_DATA_FORMS, name = 'value', children = [#xmlcdata{cdata = <<"false">>}]}]}]}]},
     lists:foreach(fun(Owner) ->
     	{U, S, R} = Owner,
-	ejabberd_router ! {route, service_jid(Host), exmpp_jid:make(U, S, R), Stanza}
+	ejabberd_router:route(service_jid(Host), exmpp_jid:make(U, S, R), Stanza)
     end, Owners).
 
 find_authorization_response(Packet) ->
@@ -1597,7 +1606,7 @@ send_authorization_approval(Host, JID, SNode, Subscription) ->
 		[#xmlel{ns = ?NS_PUBSUB_EVENT, name = 'subscription', attrs =
 		    [ ?XMLATTR('jid', exmpp_jid:to_binary(JID)) | nodeAttr(SNode)] ++ SubAttrs
 		     }]),
-    ejabberd_router ! {route, service_jid(Host), JID, Stanza}.
+    ejabberd_router:route(service_jid(Host), JID, Stanza).
  
 handle_authorization_response(Host, From, To, Packet, XFields) ->
     case {lists:keysearch("pubsub#node", 1, XFields),
@@ -2379,7 +2388,7 @@ send_items(Host, Node, NodeId, Type, LJID, last) ->
 	    	[#xmlel{ns = ?NS_PUBSUB_EVENT, name = 'items', attrs = nodeAttr(Node),
 			children = itemsEls(LastItem)}], ModifNow, ModifLjid),
 	    {U, S, R} = LJID,
-	    ejabberd_router ! {route, service_jid(Host), exmpp_jid:make(U, S, R), Stanza}
+	    ejabberd_router:route(service_jid(Host), exmpp_jid:make(U, S, R), Stanza)
     end;
 send_items(Host, Node, NodeId, Type, {LU, LS, LR} = LJID, Number) ->
     ToSend = case node_action(Host, Type, get_items, [NodeId, LJID]) of
@@ -2404,7 +2413,7 @@ send_items(Host, Node, NodeId, Type, {LU, LS, LR} = LJID, Number) ->
 		[#xmlel{ns = ?NS_PUBSUB_EVENT, name = 'items', attrs = nodeAttr(Node), children =
 		  itemsEls(ToSend)}])
     end,
-    ejabberd_router ! {route, service_jid(Host), exmpp_jid:make(LU, LS, LR), Stanza}.
+    ejabberd_router:route(service_jid(Host), exmpp_jid:make(LU, LS, LR), Stanza).
 
 %% @spec (Host, JID, Plugins) -> {error, Reason} | {result, Response}
 %%	 Host = host()
@@ -2818,7 +2827,7 @@ set_subscriptions(Host, Node, From, EntitiesEls) ->
 					name = 'subscription',
 					attrs = [?XMLATTR('jid', exmpp_jid:to_binary(JID)),
 						 ?XMLATTR('subsription', subscription_to_string(Sub)) | nodeAttr(Node)]}]}]},
-		ejabberd_router ! {route, service_jid(Host), JID, Stanza}
+		ejabberd_router:route(service_jid(Host), JID, Stanza)
 	    end,
 	    Action = fun(#pubsub_node{owners = Owners, type = Type, id = NodeId}) ->
 			    case lists:member(Owner, Owners) of
@@ -3173,7 +3182,7 @@ broadcast_stanza(Host, Node, _NodeId, _Type, NodeOptions, SubsByDepth, NotifyTyp
 			  SHIMStanza = add_headers(Stanza, collection_shim(Node, Nodes)),
 			  lists:foreach(fun(To) ->
 			  			{TU, TS, TR} = To, 
-						ejabberd_router ! {route, From, exmpp_jid:make(TU, TS, TR), SHIMStanza}
+						ejabberd_router:route(From, exmpp_jid:make(TU, TS, TR), SHIMStanza)
 					end, LJIDs)
 		  end, NodesByJID),
     %% Handles implicit presence subscriptions
@@ -3206,7 +3215,7 @@ broadcast_stanza(Host, Node, _NodeId, _Type, NodeOptions, SubsByDepth, NotifyTyp
 					end
 				    end, [], user_resources(U, S)),
 				    lists:foreach(fun(R) ->
-					ejabberd_router ! {route, Sender, exmpp_jid:make(U, S, R), Stanza}
+					ejabberd_router:route(Sender, exmpp_jid:make(U, S, R), Stanza)
 				    end, Rs)
 				end)
 			    end, Contacts);
@@ -3625,7 +3634,7 @@ select_type(ServerHost, Host, Node, Type) ->
     SelectedType = case Host of
     {_User, _Server, _Resource} -> 
 	case catch ets:lookup(gen_mod:get_module_proc(ServerHost, config), pep_mapping) of
-	[{pep_mapping, PM}] -> proplists:get_value(Node, PM, ?PEPNODE);
+	[{pep_mapping, PM}] -> proplists:get_value(node_to_string(Node), PM, ?PEPNODE);
 	_ -> ?PEPNODE
 	end;
     _ -> 

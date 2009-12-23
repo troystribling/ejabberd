@@ -85,6 +85,7 @@
 \newcommand{\modprivateodbc}{\module{mod\_private\_odbc}}
 \newcommand{\modproxy}{\module{mod\_proxy65}}
 \newcommand{\modpubsub}{\module{mod\_pubsub}}
+\newcommand{\modpubsubodbc}{\module{mod\_pubsub\_odbc}}
 \newcommand{\modregister}{\module{mod\_register}}
 \newcommand{\modroster}{\module{mod\_roster}}
 \newcommand{\modrosterodbc}{\module{mod\_roster\_odbc}}
@@ -514,7 +515,6 @@ To compile \ejabberd{} on a Microsoft Windows system, you need:
 \item MS Visual C++ 6.0 Compiler
 \item \footahref{http://www.erlang.org/download.html}{Erlang/OTP R12B-5}. Support for R13 or higher is experimental.
 \item \footahref{http://support.process-one.net/doc/display/EXMPP}{exmpp 0.9.1 or higher}
-\item \footahref{http://sourceforge.net/project/showfiles.php?group\_id=10127\&package\_id=11277}{Expat 2.0.0 or higher}
 \item \footahref{http://www.slproweb.com/products/Win32OpenSSL.html}{Shining Light OpenSSL 0.9.8d or higher}
 (to enable SSL connections)
 \item \footahref{http://www.zlib.net/}{Zlib 1.2.3 or higher}
@@ -527,15 +527,6 @@ We assume that we will try to put as much library as possible into \verb|C:\sdk\
 
 \begin{enumerate}
 \item Install Erlang emulator (for example, into \verb|C:\sdk\erl5.6.5|).
-\item Install Expat library into \verb|C:\sdk\Expat-2.0.0|
-  directory.
-
-  Copy file \verb|C:\sdk\Expat-2.0.0\Libs\libexpat.dll|
-  to your Windows system directory (for example, \verb|C:\WINNT| or
-  \verb|C:\WINNT\System32|)
-  Note: instead of copying libexpat.dll to the Windows
-  directory, you can add the directory \verb|C:\sdk\Expat-2.0.0\Libs|
-  to the \verb|PATH| environment variable.
 \item Install OpenSSL in \verb|C:\sdk\OpenSSL| and add \verb|C:\sdk\OpenSSL\lib\VC| to your path or copy the binaries to your system directory.
 \item Install ZLib in \verb|C:\sdk\gnuWin32|. Copy
   \verb|C:\sdk\GnuWin32\bin\zlib1.dll| to your system directory.
@@ -2171,8 +2162,7 @@ Example:
 {ldap_password, "secret"}.
 \end{verbatim}
 
-Note that current LDAP implementation does not support SSL secured communication
-and SASL authentication.
+Note that current LDAP implementation does not support SASL authentication.
 
 \makesubsubsection{ldapauth}{Authentication}
 
@@ -2425,6 +2415,7 @@ The following table lists all modules included in \ejabberd{}.
     \hline \ahrefloc{modprivate}{\modprivateodbc{}} & Private XML Storage (\xepref{0049}) & supported DB (*) \\
     \hline \ahrefloc{modproxy}{\modproxy{}} & SOCKS5 Bytestreams (\xepref{0065}) &  \\
     \hline \ahrefloc{modpubsub}{\modpubsub{}} & Pub-Sub (\xepref{0060}), PEP (\xepref{0163}) & \modcaps{} \\
+    \hline \ahrefloc{modpubsub}{\modpubsubodbc{}} & Pub-Sub (\xepref{0060}), PEP (\xepref{0163}) & supported DB (*) and \modcaps{} \\
     \hline \ahrefloc{modregister}{\modregister{}} & In-Band Registration (\xepref{0077}) &  \\
     \hline \ahrefloc{modroster}{\modroster{}} & Roster management (XMPP IM) &  \\
     \hline \ahrefloc{modroster}{\modrosterodbc{}} & Roster management (XMPP IM) & supported DB (*) \\
@@ -3487,6 +3478,8 @@ and it requires \modcaps{}.
 Options:
 \begin{description}
 \hostitem{pubsub}
+  If you use \modpubsubodbc, please ensure the prefix contains only one dot,
+  for example `\jid{pubsub.}', or `\jid{publish.}',.
 \titem{\{access\_createnode, AccessName\}} \ind{options!access\_createnode}
   This option restricts which users are allowed to create pubsub nodes using
   ACL and ACCESS.
@@ -3520,19 +3513,32 @@ Options:
 %  This option allows to create additional pubsub virtual hosts in a single module instance.
 \end{description}
 
-Example:
+Example of configuration that uses flat nodes as default, and allows use of flat, nodetree and pep nodes:
 \begin{verbatim}
 {modules,
  [
   ...
   {mod_pubsub, [
                 {access_createnode, pubsub_createnode},
-                {plugins, ["default", "pep"]}
-               ]}
+                {plugins, ["flat", "hometree", "pep"]}
+               ]},
   ...
  ]}.
 \end{verbatim}
-%                  {served_hosts, ["example.com", "example.org"]}
+
+Using ODBC database requires use of dedicated plugins. The following example shows previous configuration
+with ODBC usage:
+\begin{verbatim}
+{modules,
+ [
+  ...
+  {mod_pubsub_odbc, [
+                {access_createnode, pubsub_createnode},
+                {plugins, ["flat_odbc", "hometree_odbc", "pep_odbc"]}
+               ]},
+  ...
+ ]}.
+\end{verbatim}
 
 \makesubsection{modregister}{\modregister{}}
 \ind{modules!\modregister{}}\ind{protocols!XEP-0077: In-Band Registration}\ind{public registration}
@@ -4800,7 +4806,7 @@ following steps:
 \item Copy \verb|~ejabberd/.erlang.cookie| file from \term{first} to
   \term{second}.
 
-  (alt) You can also add `\verb|-cookie content_of_.erlang.cookie|'
+  (alt) You can also add `\verb|-setcookie content_of_.erlang.cookie|'
   option to all `\shell{erl}' commands below.
 
 \item On \term{second} run the following command as the \ejabberd{} daemon user,

@@ -917,6 +917,7 @@ This is a detailed description of each option allowed by the listening modules:
     \footahref{http://xmpp.org/specs/rfc3920.html\#tls}{RFC 3920: XMPP Core},
     which can be enabled in \ejabberd{} with the option \term{starttls}.
     If this option is set, you should also set the \option{certfile} option.
+    The option \term{tls} can also be used in \term{ejabberd\_http} to support HTTPS.
   \titem{web\_admin} \ind{options!web\_admin}\ind{web admin}This option
     enables the Web Admin for \ejabberd{} administration which is available
     at \verb|http://server:port/admin/|. Login and password are the username and
@@ -1413,6 +1414,11 @@ sequentially checks if that JID matches any of the ACLs that are named in the
 second elements of the tuples in the list. If it matches, the first element of
 the first matched tuple is returned, otherwise the value `\term{deny}' is
 returned.
+
+If you define specific Access rights in a virtual host,
+remember that the globally defined Access rights have precedence over those.
+This means that, in case of conflict, the Access granted or denied in the global server is used
+and the Access of a virtual host doesn't have effect.
 
 Example:
 \begin{verbatim}
@@ -4358,11 +4364,13 @@ The most interesting ones are:
   Store internal Mnesia database to a binary backup file.
 \titem {restore ejabberd.backup}
   Restore immediately from a binary backup file the internal Mnesia database.
-  This will consume quite some memory for big servers.
+  This will consume a lot of memory if you have a large database,
+  so better use \term{install\_fallback}.
 \titem {install\_fallback ejabberd.backup}
   The binary backup file is installed as fallback:
   it will be used to restore the database at the next ejabberd start.
-  Similar to \term{restore}, but requires less memory.
+  This means that, after running this command, you have to restart ejabberd.
+  This command requires less memory than \term{restore}.
 \titem {dump ejabberd.dump}
   Dump internal Mnesia database to a text file dump.
 \titem {load ejabberd.dump}
@@ -4611,9 +4619,26 @@ ejabberdctl start
 ejabberdctl mnesia_change_nodename $OLDNODE $NEWNODE $OLDFILE $NEWFILE
 \end{verbatim}
 
-\item Import the new backup:
+\item Install the backup file as a fallback:
 \begin{verbatim}
-ejabberdctl restore $NEWFILE
+ejabberdctl install_fallback $NEWFILE
+\end{verbatim}
+
+\item Stop ejabberd:
+\begin{verbatim}
+ejabberdctl stop
+\end{verbatim}
+You may see an error message in the log files, it's normal, so don't worry:
+\begin{verbatim}
+Mnesia(ejabberd@newmachine):
+** ERROR ** (ignoring core)
+** FATAL ** A fallback is installed and Mnesia must be restarted.
+  Forcing shutdown after mnesia_down from ejabberd@newmachine...
+\end{verbatim}
+
+\item Now you can finally start ejabberd:
+\begin{verbatim}
+ejabberdctl start
 \end{verbatim}
 
 \item Check that the information of the old database is available: accounts, rosters...

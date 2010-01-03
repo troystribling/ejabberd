@@ -1,8 +1,8 @@
 #!/bin/sh
-
+ 
 NODE=ejabberd
-HOST=localhost
-
+HOST=`hostname`
+ 
 # Define ejabberd environment
 ERL=erl
 here=`which "$0" 2>/dev/null || echo .`
@@ -17,11 +17,24 @@ export EJABBERD_MSGS_PATH=$ROOTDIR/src/msgs
 export EJABBERD_SO_PATH=$ROOTDIR/src
 export EJABBERD_BIN_PATH=$ROOTDIR/src
 export ERL_MAX_PORTS=32000
-
+ 
 [ -d $EJABBERD_DB ] || mkdir -p $EJABBERD_DB
 [ -f $EJABBERD_CONFIG_PATH ] || cp $ROOTDIR/src/ejabberd.cfg.example $EJABBERD_CONFIG_PATH
-
+ 
 start()
+{
+    $ERL \
+      -sname $NODE@$HOST \
+      -setcookie 12345 \
+      -pa $EJABBERD_EBIN \
+      -mnesia dir "\"$EJABBERD_DB\"" \
+      -s ejabberd \
+      -ejabberd config \"$EJABBERD_CONFIG_PATH\" \
+                log_path \"$EJABBERD_LOG_PATH\" \
+      -sasl sasl_error_logger \{file,\"$SASL_LOG_PATH\"\}
+}
+ 
+detached()
 {
     $ERL \
       -noinput -detached \
@@ -33,7 +46,7 @@ start()
                 log_path \"$EJABBERD_LOG_PATH\" \
       -sasl sasl_error_logger \{file,\"$SASL_LOG_PATH\"\}
 }
-
+ 
 debug()
 {
     $ERL \
@@ -43,7 +56,7 @@ debug()
       -hidden \
       -remsh $NODE@$HOST
 }
-
+ 
 ctl()
 {
     $ERL \
@@ -53,15 +66,15 @@ ctl()
       -hidden \
       -s ejabberd_ctl -extra $NODE@$HOST $@
 }
-
+ 
 usage()
 {
     ctl
     exit
 }
-
+ 
 [ $# -lt 1 ] && usage
-
+ 
 case $1 in
     start) start;;
     debug) debug;;

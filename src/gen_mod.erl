@@ -70,7 +70,7 @@ start_module(Host, Module, Opts) ->
 	{'EXIT', Reason} ->
 	    del_module_mnesia(Host, Module),
 	    ets:delete(ejabberd_modules, {Module, Host}),
-	    ?ERROR_MSG("~p", [Reason]);
+	    ?ERROR_MSG("could not start module:~p for host: ~p, ~p", [Module,Host,Reason]);
 	_ ->
 	    ok
     end.

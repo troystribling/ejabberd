@@ -41,6 +41,8 @@
 	 unregister_iq_handler/2,
 	 unregister_iq_response_handler/2,
 	 refresh_iq_handlers/0,
+	 register_host/1,
+	 unregister_host/1,
 	 bounce_resource_packet/3
 	]).
 
@@ -157,6 +159,12 @@ unregister_iq_handler(Host, XMLNS) ->
 refresh_iq_handlers() ->
     ejabberd_local ! refresh_iq_handlers.
 
+register_host(Host) ->
+    ejabberd_local ! {register_host, Host}.
+    
+unregister_host(Host) ->
+     ejabberd_local ! {unregister_host, Host}.
+        
 bounce_resource_packet(From, To, Packet) ->
     Err = jlib:make_error_reply(Packet, ?ERR_ITEM_NOT_FOUND),
     ejabberd_router:route(To, From, Err),
@@ -256,6 +264,14 @@ handle_info(refresh_iq_handlers, State) ->
 	      end
       end, ets:tab2list(?IQTABLE)),
     {noreply, State};
+handle_info({register_host, Host}, State) ->
+    ejabberd_router:register_route(Host, {apply, ?MODULE, route}),
+    ejabberd_hooks:add(local_send_to_resource_hook, Host, ?MODULE, bounce_resource_packet, 100),
+    {noreply, State};
+handle_info({unregister_host, Host}, State) ->
+    ejabberd_router:unregister_route(Host),
+    ejabberd_hooks:delete(local_send_to_resource_hook, Host, ?MODULE, bounce_resource_packet, 100),
+    {noreply, State};        
 handle_info({timeout, _TRef, ID}, State) ->
     process_iq_timeout(ID),
     {noreply, State};

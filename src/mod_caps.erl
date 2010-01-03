@@ -186,7 +186,8 @@ start(Host, Opts) ->
 
 stop(Host) ->
     Proc = gen_mod:get_module_proc(Host, ?PROCNAME),
-    gen_server:call(Proc, stop).
+    gen_server:call(Proc, stop),
+    supervisor:delete_child(ejabberd_sup, Proc).
 
 receive_packet(From, To, {xmlelement, "presence", Attrs, Els}) ->
     case xml:get_attr_s("type", Attrs) of

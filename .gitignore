@@ -11,6 +11,7 @@ db/*
 *.LOG
 *.log
 *.cfg
+.DS_Store
 Makefile
 *.status
 *.so

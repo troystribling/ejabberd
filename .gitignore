@@ -13,7 +13,6 @@ db/*
 *.cfg
 .DS_Store
 Makefile
-*.status
 *.so
 src/XmppAddr.asn1db
 src/XmppAddr.erl

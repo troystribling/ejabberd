@@ -51,7 +51,8 @@ prod()
 debug()
 {
     $ERL \
-      -sname debug$NODE@$HOST \
+      -sname dbug-$NODE@$HOST \
+      -setcookie 12345 \
       -pa $EJABBERD_EBIN \
       -mnesia dir "\"$EJABBERD_DB\"" \
       -hidden \
@@ -61,7 +62,8 @@ debug()
 ctl()
 {
     $ERL \
-      -sname ctl$NODE@$HOST \
+      -sname ctl-$NODE@$HOST \
+      -setcookie 12345 \
       -pa $EJABBERD_EBIN \
       -noinput \
       -hidden \
